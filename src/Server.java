@@ -16,12 +16,16 @@ public class Server extends Thread{
     @Override
     public void run(){
         System.out.println("The server is running.");
+        int connectionsAccepted = 0;
+        int numConnections = Integer.parseInt(peerData.get(this.peerID)[3]);
+        System.out.println(numConnections);
         try {
             ServerSocket listener = new ServerSocket(Integer.parseInt(peerData.get(this.peerID)[1]));
             try{
-                while(true){
-                    new ServerThread(listener.accept(), peer, peerID).start();
+                while(connectionsAccepted < numConnections){
+                    new ConnectionThread(listener.accept(), peer, peerData, false).start();
                     System.out.println("Server "  + peerID + " accepted Connection");
+                    connectionsAccepted++;
                 }
             }
             finally {

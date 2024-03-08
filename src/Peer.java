@@ -8,12 +8,15 @@ public class Peer {
     private int fileSize;
     private int PieceSize;
     boolean hasFile;
+
+    FileLogger fileLogger;
     public Peer(LinkedHashMap<String,String> commonData, LinkedHashMap<Integer,String[]> peerData, int peerID){
            this.peerID = peerID;
            this.hasFile = Integer.parseInt(peerData.get(this.peerID)[2]) == 1;
            this.fileSize = Integer.parseInt(commonData.get("FileSize"));
            this.PieceSize = Integer.parseInt(commonData.get("PieceSize"));
            this.numPieces = (int) Math.ceil((double) this.fileSize / (double) this.PieceSize);
+           fileLogger = new FileLogger(peerID);
            initializeBitfield();
     }
 

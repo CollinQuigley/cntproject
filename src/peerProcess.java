@@ -27,16 +27,9 @@ public class peerProcess {
 
          //Bitfield.initializeBitfield();
 
-
-
-
-
-
-
-
-
         LinkedHashMap<String,String> commonData = CustomFileReader.readCommon(commonPath);
         LinkedHashMap<Integer,String[]> peerData = CustomFileReader.readPeerInfo(peerInfoPath);
+
 
       Peer peer = new Peer(commonData, peerData, peerID);
 
@@ -45,6 +38,7 @@ public class peerProcess {
 
       Server server = new Server(peer, peerID, peerData);
       server.start();
+
 
 
         /*for (Map.Entry<String, String> entry : commonData.entrySet()) {
@@ -60,6 +54,10 @@ public class peerProcess {
             }
             System.out.println();
         }*/
+       while(Thread.activeCount() > 1){
 
+       }
+        System.out.println("CLosing file");
+       peer.fileLogger.close();
     }
 }
