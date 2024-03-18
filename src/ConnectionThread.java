@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.LinkedHashMap;
 
 public class ConnectionThread extends Thread{
@@ -40,23 +42,36 @@ public class ConnectionThread extends Thread{
 
         System.out.println(peer.getPeerID() + " has started TCP connection with peer process " + remoteHost + " " + remotePort);
 
-        // initial handshake
-        try {
-            if(!handshake)
-                doHandshake();
-        }
-        catch (IOException e) {
-            System.out.println(e);
-        }
-
+        // eventually will need to loop constantly for incoming messages
+        // until bitfield is full and all neighbors' bitfields are full
         try{
-            byte[] newMessage = in.readAllBytes();
+            // initial handshake and have messages
+            if(!handshake) {
+                doHandshake();
+
+                byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.getBitfield());
+                sendMessage(bitfieldMessage, out);
+            }
+
+            byte[] newMessage = readMessage(in);
             int messageType = newMessage[4];
+            int messageLength = getMessageLength(newMessage);
 
             switch(messageType) {
-                // have message
+                // peer has received a bitfield message (optional)
                 case 5:
+                    byte[] payloadArr = Arrays.copyOfRange(newMessage, 5, messageLength + 5);
+                    BitSet payload = BitSet.valueOf(payloadArr);
 
+                    // check if connected peer has data the current peer does not have
+                    if(peer.getBitfield().equals(payload)) {
+                        byte[] notInterestedMessage = Messages.getNotInterestedMessage();
+                        sendMessage(notInterestedMessage, out);
+                    }
+                    else {
+                        byte[] interestedMessage = Messages.getInterestedMessage();
+                        sendMessage(interestedMessage, out);
+                    }
                     break;
 
                 // default catch all
@@ -129,7 +144,7 @@ public class ConnectionThread extends Thread{
         return handshakeMessage;
     }
 
-    private byte[] readMessage(DataInputStream in) {
+    private byte[] readMessage(DataInputStream in){
         // allocate 4 bytes then wrap to bytebuffer to get integer value of message length
         byte[] lengthBytes = new byte[4];
         byte[] message;
@@ -144,12 +159,18 @@ public class ConnectionThread extends Thread{
             // create new byte array and readFully into it, then append remaining message to bf
             message = new byte[messageLength + 4];
             System.arraycopy(lengthBytes, 0, message, 0, 4);
-            in.readFully(message, 4, messageLength - 4);
+            in.readFully(message, 4, messageLength);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
         return message;
+    }
+
+    private int getMessageLength(byte[] message){
+        byte[] subArray = Arrays.copyOfRange(message, 0, 4);
+        ByteBuffer buffer = ByteBuffer.wrap(subArray);
+        return buffer.getInt();
     }
 }
 

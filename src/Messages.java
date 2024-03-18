@@ -20,7 +20,7 @@ public class Messages {
         return buffer.array();
     }
 
-    public static byte[] getHaveMessage(BitSet bf) throws IOException {
+    public static byte[] getBitfieldMessage(BitSet bf) throws IOException {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         // Start with 1 byte for the message type field
         int length = 1;
@@ -39,6 +39,28 @@ public class Messages {
         stream.close();
 
         return stream.toByteArray();
+    }
+
+    public static byte[] getNotInterestedMessage() {
+        ByteBuffer buffer = ByteBuffer.allocate(5);
+        buffer.putInt(1);
+
+        byte[] type = new byte[1];
+        type[0] = 3;
+        buffer.put(type);
+
+        return buffer.array();
+    }
+
+    public static byte[] getInterestedMessage() {
+        ByteBuffer buffer = ByteBuffer.allocate(5);
+        buffer.putInt(1);
+
+        byte[] type = new byte[1];
+        type[0] = 2;
+        buffer.put(type);
+
+        return buffer.array();
     }
 
 }
