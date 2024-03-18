@@ -15,6 +15,8 @@ public class ConnectionThread extends Thread{
     private Socket connection;
     private String remoteHost;
     private int remotePort;
+
+    private int remotePeerID;
     private boolean handshake = false;
 
     private boolean isInitiatedByThisProcess;
@@ -39,8 +41,6 @@ public class ConnectionThread extends Thread{
 
     @Override
     public void run(){
-
-        System.out.println(peer.getPeerID() + " has started TCP connection with peer process " + remoteHost + " " + remotePort);
 
         // eventually will need to loop constantly for incoming messages
         // until bitfield is full and all neighbors' bitfields are full
@@ -101,31 +101,31 @@ public class ConnectionThread extends Thread{
             sendMessage(handshakeMessage, out);
             byte[] handShakeMessage = readHandShakeMessage(in);
             String handshakeHeader = new String(handShakeMessage, 0, 18);
-            System.out.println("Handshake Header: " + handshakeHeader);
+
 
             // Extract zero bits (next 10 bytes)
             String zeroBits = new String(handShakeMessage, 18, 10);
-            System.out.println("Zero Bits: " + zeroBits);
+
 
             // Extract peer ID (last 4 bytes)
             ByteBuffer buffer = ByteBuffer.wrap(handShakeMessage, 28, 4);
-            int remotePeerID = buffer.getInt();
-            System.out.println("Peer ID: " + remotePeerID);
+            this.remotePeerID = buffer.getInt();
+
             peer.fileLogger.makeConnection(remotePeerID);
         }
         else{
             byte[] handShakeMessage = readHandShakeMessage(in);
             String handshakeHeader = new String(handShakeMessage, 0, 18);
-            System.out.println("Handshake Header: " + handshakeHeader);
 
-            // Extract zero bits (next 10 bytes)
+
+
             String zeroBits = new String(handShakeMessage, 18, 10);
-            System.out.println("Zero Bits: " + zeroBits);
+
 
             // Extract peer ID (last 4 bytes)
             ByteBuffer buffer = ByteBuffer.wrap(handShakeMessage, 28, 4);
-            int remotePeerID = buffer.getInt();
-            System.out.println("Peer ID: " + remotePeerID);
+            this.remotePeerID = buffer.getInt();
+
             byte[] handshakeMessage = Messages.getHandShakeMessage(peer.getPeerID());
             sendMessage(handshakeMessage, out);
             peer.fileLogger.isConnected(remotePeerID);

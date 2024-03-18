@@ -57,7 +57,7 @@ public class peerProcess {
        while(Thread.activeCount() > 1){
 
        }
-        System.out.println("Closing file");
+
        peer.fileLogger.close();
     }
 }

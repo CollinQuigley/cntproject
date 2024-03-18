@@ -1,5 +1,6 @@
 import java.util.BitSet;
 import java.util.LinkedHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Peer {
     private BitSet bitField;
@@ -7,11 +8,13 @@ public class Peer {
     private int numPieces;
     private int fileSize;
     private int PieceSize;
+    private ConcurrentHashMap<Integer, BitSet> otherPeersBitFields;
     boolean hasFile;
 
     FileLogger fileLogger;
     public Peer(LinkedHashMap<String,String> commonData, LinkedHashMap<Integer,String[]> peerData, int peerID){
            this.peerID = peerID;
+
            this.hasFile = Integer.parseInt(peerData.get(this.peerID)[2]) == 1;
            this.fileSize = Integer.parseInt(commonData.get("FileSize"));
            this.PieceSize = Integer.parseInt(commonData.get("PieceSize"));
@@ -70,4 +73,25 @@ public class Peer {
             System.out.println();
         }
     }
+
+   //Initialize remote peer process bitfield for reference
+    public synchronized void createOtherPeerBitField(int peerID, BitSet bitField) {
+        otherPeersBitFields.put(peerID, bitField);
+    }
+
+    //update bitfield in specified remote peer process
+    public synchronized void updateOtherPeerBitField(int peerID, int pieceIndex) {
+        BitSet bitField = otherPeersBitFields.get(peerID);
+        if (bitField != null) {
+            bitField.set(pieceIndex);
+            otherPeersBitFields.put(peerID, bitField);
+        }
+    }
+
+    //get a bitfield of a remote peer process
+    public synchronized BitSet getOtherPeerBitField(int peerID) {
+        return otherPeersBitFields.get(peerID);
+    }
+
+
 }

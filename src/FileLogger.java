@@ -29,7 +29,7 @@ public class FileLogger {
         String formattedTime = currentTime.format(formatter);
 
         String message = "[" + formattedTime + "]: Peer [" + peerID + "] makes a connection to Peer [" + remotePeerID + "]";
-        System.out.println("writing string " + message);
+
         try {
             fileWriter.write(message);
             fileWriter.newLine();
@@ -46,7 +46,7 @@ public class FileLogger {
         String formattedTime = currentTime.format(formatter);
 
         String message = "[" + formattedTime + "]: Peer [" + peerID + "] is connected from Peer [" + remotePeerID + "]";
-        System.out.println("writing string " + message);
+
         try {
             fileWriter.write(message);
             fileWriter.newLine();
