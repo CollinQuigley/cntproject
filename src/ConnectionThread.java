@@ -49,28 +49,47 @@ public class ConnectionThread extends Thread{
             if(!handshake) {
                 doHandshake();
 
-                byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.getBitfield());
+                byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.bf.getBitfield());
                 sendMessage(bitfieldMessage, out);
+
             }
+
 
             byte[] newMessage = readMessage(in);
             int messageType = newMessage[4];
+            System.out.println(messageType);
             int messageLength = getMessageLength(newMessage);
+            System.out.println(messageLength);
+
+
+
+// Printing message in the specified format
 
             switch(messageType) {
                 // peer has received a bitfield message (optional)
                 case 5:
-                    byte[] payloadArr = Arrays.copyOfRange(newMessage, 5, messageLength + 5);
-                    BitSet payload = BitSet.valueOf(payloadArr);
-
+                    byte[] payload = Arrays.copyOfRange(newMessage, 5, messageLength - 1 + 5);
+                    peer.createOtherPeerBitField(remotePeerID, payload);
                     // check if connected peer has data the current peer does not have
-                    if(peer.getBitfield().equals(payload)) {
-                        byte[] notInterestedMessage = Messages.getNotInterestedMessage();
-                        sendMessage(notInterestedMessage, out);
+                    /*System.out.println(peer.getPeerID() + " length " + peer.bf.getBitfield().length);
+                    System.out.println(remotePeerID + " length " + peer.getOtherPeerBitField(remotePeerID).getBitfield().length);
+                    System.out.println(peer.getPeerID() + " Bitfield");
+                    peer.bf.printBitfield();
+                    System.out.println(remotePeerID + " Bitfield");
+                    peer.getOtherPeerBitField(remotePeerID).printBitfield();*/
+
+
+
+
+                    if(Arrays.equals(peer.bf.getBitfield(), peer.getOtherPeerBitField(remotePeerID).getBitfield()) || peer.hasFile) {
+                        System.out.println(peer.getPeerID() + " is not Interested in " + remotePeerID);
+                        //byte[] notInterestedMessage = Messages.getNotInterestedMessage();
+                        //sendMessage(notInterestedMessage, out);
                     }
                     else {
-                        byte[] interestedMessage = Messages.getInterestedMessage();
-                        sendMessage(interestedMessage, out);
+                        System.out.println(peer.getPeerID() + " is Interested in " + remotePeerID);
+                        //byte[] interestedMessage = Messages.getInterestedMessage();
+                        //sendMessage(interestedMessage, out);
                     }
                     break;
 

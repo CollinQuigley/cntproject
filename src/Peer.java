@@ -3,12 +3,14 @@ import java.util.LinkedHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Peer {
-    private BitSet bitField;
+    public BitField bf;
+
+
     private int peerID;
     private int numPieces;
     private int fileSize;
     private int PieceSize;
-    private ConcurrentHashMap<Integer, BitSet> otherPeersBitFields;
+    public ConcurrentHashMap<Integer, BitField> otherPeersBitFields;
     boolean hasFile;
 
     FileLogger fileLogger;
@@ -20,77 +22,53 @@ public class Peer {
            this.PieceSize = Integer.parseInt(commonData.get("PieceSize"));
            this.numPieces = (int) Math.ceil((double) this.fileSize / (double) this.PieceSize);
            fileLogger = new FileLogger(peerID);
-           initializeBitfield();
+           this.bf = new BitField(numPieces, hasFile);
+           this.otherPeersBitFields = new ConcurrentHashMap<>();
+           System.out.println(numPieces);
+
+
     }
 
     public int getPeerID(){
         return peerID;
     }
-    private synchronized void initializeBitfield() {
-        bitField = new BitSet(numPieces);
-        if (hasFile) {
-            bitField.set(0, numPieces);
-        }
-    }
-
-    // Set a specific bit in the bitfield to 0
-    public synchronized void clearBit(int Piece) {
-        if (Piece < 1 || Piece > numPieces){
-            return;
-        }
-        bitField.clear(Piece - 1);
-    }
-
-    // Set a specific bit in the bitfield to 1
-    public synchronized void setBit(int Piece) {
-        if (Piece < 1 || Piece > numPieces){
-            return;
-        }
-        bitField.set(Piece - 1);
-    }
-
-    // Get the value of a specific bit in the bitfield
-    public synchronized boolean getBit(int Piece) {
-        return bitField.get(Piece - 1);
-    }
-
-    // Get the entire bitfield
-    public synchronized BitSet getBitfield() {
-
-        return (BitSet) bitField.clone();
-    }
-
-    // Set the entire bitfield
-    public synchronized void setBitfield(BitSet newBitfield) {
-        bitField =  (BitSet) newBitfield.clone();
-    }
-
-    public synchronized void printBitfield(){
-        System.out.print("peerProcess " + peerID + " Bitfield: ");
-        System.out.println();
-        for (int i = 0; i < numPieces; i++) {
-            System.out.print("Piece: " + (i + 1) + " " + (bitField.get(i) ? "1" : "0"));
-            System.out.println();
-        }
-    }
 
    //Initialize remote peer process bitfield for reference
-    public synchronized void createOtherPeerBitField(int peerID, BitSet bitField) {
-        otherPeersBitFields.put(peerID, bitField);
+    public synchronized void createOtherPeerBitField(int remotePeerID, byte[] remoteBitField) {
+        BitField bf = new BitField(numPieces, remoteBitField);
+        otherPeersBitFields.put(remotePeerID, bf);
     }
 
     //update bitfield in specified remote peer process
     public synchronized void updateOtherPeerBitField(int peerID, int pieceIndex) {
-        BitSet bitField = otherPeersBitFields.get(peerID);
-        if (bitField != null) {
-            bitField.set(pieceIndex);
-            otherPeersBitFields.put(peerID, bitField);
+        BitField bf = otherPeersBitFields.get(peerID);
+        if (bf != null) {
+            bf.setBit(pieceIndex);
+            otherPeersBitFields.put(peerID, bf);
+        }
+    }
+
+    public synchronized boolean hasOtherPeerBitField(int remotePeerID, int pieceIndex){
+        BitField bf = otherPeersBitFields.get(peerID);
+        if (bf != null) {
+            return bf.hasBit(pieceIndex);
+        }
+        else{
+            return false;
         }
     }
 
     //get a bitfield of a remote peer process
-    public synchronized BitSet getOtherPeerBitField(int peerID) {
+    public synchronized BitField getOtherPeerBitField(int peerID) {
         return otherPeersBitFields.get(peerID);
+    }
+
+    public void printOtherPeersBitFields() {
+        for (Integer peerId : otherPeersBitFields.keySet()) {
+            System.out.println("Bitfield for peer " + peerId + ":");
+            BitField bitField = otherPeersBitFields.get(peerId);
+            bitField.printBitfield();
+        }
     }
 
 

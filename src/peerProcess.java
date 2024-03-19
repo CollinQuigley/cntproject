@@ -57,7 +57,9 @@ public class peerProcess {
        while(Thread.activeCount() > 1){
 
        }
-
+       //System.out.println("Printing peer process " + peerID + " bitfields for other peers");
+       //peer.printOtherPeersBitFields();
        peer.fileLogger.close();
+
     }
 }

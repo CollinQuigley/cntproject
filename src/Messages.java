@@ -20,13 +20,13 @@ public class Messages {
         return buffer.array();
     }
 
-    public static byte[] getBitfieldMessage(BitSet bf) throws IOException {
+    public static byte[] getBitfieldMessage(byte[] bf) throws IOException {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         // Start with 1 byte for the message type field
         int length = 1;
 
-        byte[] payload = bf.toByteArray();
-        length += payload.length;
+
+        length += bf.length;
 
         // create a 4 byte buffer to hold the length variable
         ByteBuffer buffer = ByteBuffer.allocate(4);
@@ -35,10 +35,11 @@ public class Messages {
 
         stream.write(buffer.array());
         stream.write(5);
-        stream.write(payload);
+        stream.write(bf);
+        byte[] message = stream.toByteArray();
         stream.close();
 
-        return stream.toByteArray();
+        return message;
     }
 
     public static byte[] getNotInterestedMessage() {
