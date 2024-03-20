@@ -41,62 +41,57 @@ public class ConnectionThread extends Thread{
 
     @Override
     public void run(){
-
         // eventually will need to loop constantly for incoming messages
         // until bitfield is full and all neighbors' bitfields are full
-        try{
+        try {
             // initial handshake and have messages
-            if(!handshake) {
+            if (!handshake) {
                 doHandshake();
 
                 byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.bf.getBitfield());
                 sendMessage(bitfieldMessage, out);
-
             }
 
+            //for now while true for receiving messages. In the future implement loop to stop when all peer processes have received file
+            while (true) {
+                byte[] newMessage = readMessage(in);
+                int messageType = newMessage[4];
+                int messageLength = getMessageLength(newMessage);
 
-            byte[] newMessage = readMessage(in);
-            int messageType = newMessage[4];
-            System.out.println(messageType);
-            int messageLength = getMessageLength(newMessage);
-            System.out.println(messageLength);
+                //switch statement for each message type DON"T FORGET break; FOR EACH CASE
+                switch (messageType) {
+                    //peer has received interested message from remotePeer. Set remotePeer to interested
+                    case 2:
+                        //System.out.println("Peer Process " + remotePeerID + " is interested in Peer Process " + peer.getPeerID() + "'s pieces");
+                        peer.setInterested(remotePeerID);
+                        break;
+                    //peer has received not interested message from remotePeer. Set remotePeer to not interested
+                    case 3:
+                        //System.out.println("Peer Process " + remotePeerID + " is not interested in Peer Process " + peer.getPeerID() + "'s pieces");
+                        peer.removeInterested(remotePeerID);
+                        break;
+                    // peer has received a bitfield message (optional)
+                    case 5:
+                        byte[] payload = Arrays.copyOfRange(newMessage, 5, messageLength - 1 + 5);
+                        peer.createOtherPeerBitField(remotePeerID, payload);
 
+                        if (Arrays.equals(peer.bf.getBitfield(), peer.getOtherPeerBitField(remotePeerID).getBitfield()) || peer.hasFile) {
 
+                            byte[] notInterestedMessage = Messages.getNotInterestedMessage();
+                            sendMessage(notInterestedMessage, out);
 
-// Printing message in the specified format
+                        } else {
 
-            switch(messageType) {
-                // peer has received a bitfield message (optional)
-                case 5:
-                    byte[] payload = Arrays.copyOfRange(newMessage, 5, messageLength - 1 + 5);
-                    peer.createOtherPeerBitField(remotePeerID, payload);
-                    // check if connected peer has data the current peer does not have
-                    /*System.out.println(peer.getPeerID() + " length " + peer.bf.getBitfield().length);
-                    System.out.println(remotePeerID + " length " + peer.getOtherPeerBitField(remotePeerID).getBitfield().length);
-                    System.out.println(peer.getPeerID() + " Bitfield");
-                    peer.bf.printBitfield();
-                    System.out.println(remotePeerID + " Bitfield");
-                    peer.getOtherPeerBitField(remotePeerID).printBitfield();*/
+                            byte[] interestedMessage = Messages.getInterestedMessage();
+                            sendMessage(interestedMessage, out);
+                        }
+                        break;
 
-
-
-
-                    if(Arrays.equals(peer.bf.getBitfield(), peer.getOtherPeerBitField(remotePeerID).getBitfield()) || peer.hasFile) {
-                        System.out.println(peer.getPeerID() + " is not Interested in " + remotePeerID);
-                        //byte[] notInterestedMessage = Messages.getNotInterestedMessage();
-                        //sendMessage(notInterestedMessage, out);
-                    }
-                    else {
-                        System.out.println(peer.getPeerID() + " is Interested in " + remotePeerID);
-                        //byte[] interestedMessage = Messages.getInterestedMessage();
-                        //sendMessage(interestedMessage, out);
-                    }
-                    break;
-
-                // default catch all
-                default:
-                    System.out.println("Unsupported message type " + messageType);
-                    break;
+                    // default catch all
+                    default:
+                        System.out.println("Unsupported message type " + messageType);
+                        break;
+                }
             }
         }
         catch (Exception e) {

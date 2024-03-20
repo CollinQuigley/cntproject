@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.sql.SQLOutput;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
@@ -31,9 +32,14 @@ public class peerProcess {
         LinkedHashMap<Integer,String[]> peerData = CustomFileReader.readPeerInfo(peerInfoPath);
 
 
-      Peer peer = new Peer(commonData, peerData, peerID);
+        Peer peer = null;
+        try {
+            peer = new Peer(commonData, peerData, peerID);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
-      Client client = new Client(peer, peerData);
+        Client client = new Client(peer, peerData);
       client.start();
 
       Server server = new Server(peer, peerID, peerData);
