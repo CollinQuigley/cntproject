@@ -1,73 +1,166 @@
-import java.util.BitSet;
-import java.util.LinkedHashMap;
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Peer {
-    private BitSet bitField;
+    public BitField bf;
+
+
     private int peerID;
     private int numPieces;
     private int fileSize;
-    private int PieceSize;
+    private int pieceSize;
+    public ConcurrentHashMap<Integer, BitField> otherPeersBitFields;
+    private Set<Integer> peersInterested;
+
+    private Map<Integer, byte[]> filePieces;
     boolean hasFile;
 
     FileLogger fileLogger;
-    public Peer(LinkedHashMap<String,String> commonData, LinkedHashMap<Integer,String[]> peerData, int peerID){
+    public Peer(LinkedHashMap<String,String> commonData, LinkedHashMap<Integer,String[]> peerData, int peerID) throws IOException {
            this.peerID = peerID;
+
            this.hasFile = Integer.parseInt(peerData.get(this.peerID)[2]) == 1;
            this.fileSize = Integer.parseInt(commonData.get("FileSize"));
-           this.PieceSize = Integer.parseInt(commonData.get("PieceSize"));
-           this.numPieces = (int) Math.ceil((double) this.fileSize / (double) this.PieceSize);
+           this.pieceSize = Integer.parseInt(commonData.get("PieceSize"));
+           this.numPieces = (int) Math.ceil((double) this.fileSize / (double) this.pieceSize);
            fileLogger = new FileLogger(peerID);
-           initializeBitfield();
+           this.bf = new BitField(numPieces, hasFile);
+           this.otherPeersBitFields = new ConcurrentHashMap<>();
+
+           filePieces = new ConcurrentHashMap<>();
+           Set<Integer> set = new HashSet<>();
+           peersInterested = Collections.synchronizedSet(set);
+
+           if(hasFile) {
+               readFile(commonData.get("FileName"));
+           }
+           else{
+               initializePieces();
+           }
+
+
     }
 
     public int getPeerID(){
         return peerID;
     }
-    private synchronized void initializeBitfield() {
-        bitField = new BitSet(numPieces);
-        if (hasFile) {
-            bitField.set(0, numPieces);
+
+   //Initialize remote peer process bitfield for reference
+    public synchronized void createOtherPeerBitField(int remotePeerID, byte[] remoteBitField) {
+        BitField bf = new BitField(numPieces, remoteBitField);
+        otherPeersBitFields.put(remotePeerID, bf);
+    }
+
+    //update bitfield in specified remote peer process
+    public synchronized void updateOtherPeerBitField(int peerID, int pieceIndex) {
+        BitField bf = otherPeersBitFields.get(peerID);
+        if (bf != null) {
+            bf.setBit(pieceIndex);
+            otherPeersBitFields.put(peerID, bf);
         }
     }
 
-    // Set a specific bit in the bitfield to 0
-    public synchronized void clearBit(int Piece) {
-        if (Piece < 1 || Piece > numPieces){
-            return;
+    public synchronized boolean hasOtherPeerBitField(int remotePeerID, int pieceIndex){
+        BitField bf = otherPeersBitFields.get(peerID);
+        if (bf != null) {
+            return bf.hasBit(pieceIndex);
         }
-        bitField.clear(Piece - 1);
-    }
-
-    // Set a specific bit in the bitfield to 1
-    public synchronized void setBit(int Piece) {
-        if (Piece < 1 || Piece > numPieces){
-            return;
+        else{
+            return false;
         }
-        bitField.set(Piece - 1);
     }
 
-    // Get the value of a specific bit in the bitfield
-    public synchronized boolean getBit(int Piece) {
-        return bitField.get(Piece - 1);
+    //get a bitfield of a remote peer process
+    public synchronized BitField getOtherPeerBitField(int peerID) {
+        return otherPeersBitFields.get(peerID);
     }
 
-    // Get the entire bitfield
-    public synchronized BitSet getBitfield() {
-
-        return (BitSet) bitField.clone();
-    }
-
-    // Set the entire bitfield
-    public synchronized void setBitfield(BitSet newBitfield) {
-        bitField =  (BitSet) newBitfield.clone();
-    }
-
-    public synchronized void printBitfield(){
-        System.out.print("peerProcess " + peerID + " Bitfield: ");
-        System.out.println();
-        for (int i = 0; i < numPieces; i++) {
-            System.out.print("Piece: " + (i + 1) + " " + (bitField.get(i) ? "1" : "0"));
-            System.out.println();
+    public void printOtherPeersBitFields() {
+        for (Integer peerId : otherPeersBitFields.keySet()) {
+            System.out.println("Bitfield for peer " + peerId + ":");
+            BitField bitField = otherPeersBitFields.get(peerId);
+            bitField.printBitfield();
         }
+    }
+
+    public void setInterested(int peerID){
+
+        peersInterested.add(peerID);
+
+    }
+
+    public void removeInterested(int peerID){
+
+        peersInterested.remove(peerID);
+
+    }
+    public boolean isInterested(int peerID){
+
+        return peersInterested.contains(peerID);
+
+    }
+
+    //print to see who is interested for debugging if needed
+    public void printInterested() {
+        System.out.println("Peers Interested:");
+        for (Integer peerID : peersInterested) {
+            System.out.println(peerID);
+        }
+    }
+
+    //initialize file pieces if peerProcess does not have file.
+    private void initializePieces(){
+
+        for(int i = 0; i < numPieces; i++){
+            filePieces.put(i, new byte[pieceSize]);
+        }
+
+    }
+
+    //read the file and store pieces if peerProcess has the file
+    private void readFile(String fileName) throws IOException {
+        String filePath = "./project_config_file_large/" + peerID + "/" + fileName;
+        File file = new File(filePath);
+        FileInputStream inputStream;
+        try {
+            inputStream = new FileInputStream(file);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            int bytesRead;
+            byte[] buffer = new byte[pieceSize];
+
+            int pieceIndex = 0;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                if (bytesRead < pieceSize) {
+                    byte[] trimmedBuffer = new byte[bytesRead];
+                    System.arraycopy(buffer, 0, trimmedBuffer, 0, bytesRead);
+                    filePieces.put(pieceIndex, trimmedBuffer);
+                } else {
+                    filePieces.put(pieceIndex, buffer.clone());
+                }
+                pieceIndex++;
+            }
+        } finally {
+            inputStream.close();
+        }
+        /*if (file.exists()) {
+            System.out.println("File exists.");
+        } else {
+            System.out.println("File does not exist.");
+        }*/
+        //System.out.println(filePath);
+    }
+
+
+    //write file to test if file data is stored properly in filePieces
+    private void reassembleFile() throws IOException {
+        FileOutputStream outputStream = new FileOutputStream("reassembled_file.jpg");
+        for (int i = 0; i < filePieces.size(); i++) {
+            outputStream.write(filePieces.get(i));
+        }
+        outputStream.close();
     }
 }

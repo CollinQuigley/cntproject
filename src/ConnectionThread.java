@@ -15,6 +15,8 @@ public class ConnectionThread extends Thread{
     private Socket connection;
     private String remoteHost;
     private int remotePort;
+
+    private int remotePeerID;
     private boolean handshake = false;
 
     private boolean isInitiatedByThisProcess;
@@ -39,45 +41,57 @@ public class ConnectionThread extends Thread{
 
     @Override
     public void run(){
-
-        System.out.println(peer.getPeerID() + " has started TCP connection with peer process " + remoteHost + " " + remotePort);
-
         // eventually will need to loop constantly for incoming messages
         // until bitfield is full and all neighbors' bitfields are full
-        try{
+        try {
             // initial handshake and have messages
-            if(!handshake) {
+            if (!handshake) {
                 doHandshake();
 
-                byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.getBitfield());
+                byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.bf.getBitfield());
                 sendMessage(bitfieldMessage, out);
             }
 
-            byte[] newMessage = readMessage(in);
-            int messageType = newMessage[4];
-            int messageLength = getMessageLength(newMessage);
+            //for now while true for receiving messages. In the future implement loop to stop when all peer processes have received file
+            while (true) {
+                byte[] newMessage = readMessage(in);
+                int messageType = newMessage[4];
+                int messageLength = getMessageLength(newMessage);
 
-            switch(messageType) {
-                // peer has received a bitfield message (optional)
-                case 5:
-                    byte[] payloadArr = Arrays.copyOfRange(newMessage, 5, messageLength + 5);
-                    BitSet payload = BitSet.valueOf(payloadArr);
+                //switch statement for each message type DON"T FORGET break; FOR EACH CASE
+                switch (messageType) {
+                    //peer has received interested message from remotePeer. Set remotePeer to interested
+                    case 2:
+                        //System.out.println("Peer Process " + remotePeerID + " is interested in Peer Process " + peer.getPeerID() + "'s pieces");
+                        peer.setInterested(remotePeerID);
+                        break;
+                    //peer has received not interested message from remotePeer. Set remotePeer to not interested
+                    case 3:
+                        //System.out.println("Peer Process " + remotePeerID + " is not interested in Peer Process " + peer.getPeerID() + "'s pieces");
+                        peer.removeInterested(remotePeerID);
+                        break;
+                    // peer has received a bitfield message (optional)
+                    case 5:
+                        byte[] payload = Arrays.copyOfRange(newMessage, 5, messageLength - 1 + 5);
+                        peer.createOtherPeerBitField(remotePeerID, payload);
 
-                    // check if connected peer has data the current peer does not have
-                    if(peer.getBitfield().equals(payload)) {
-                        byte[] notInterestedMessage = Messages.getNotInterestedMessage();
-                        sendMessage(notInterestedMessage, out);
-                    }
-                    else {
-                        byte[] interestedMessage = Messages.getInterestedMessage();
-                        sendMessage(interestedMessage, out);
-                    }
-                    break;
+                        if (Arrays.equals(peer.bf.getBitfield(), peer.getOtherPeerBitField(remotePeerID).getBitfield()) || peer.hasFile) {
 
-                // default catch all
-                default:
-                    System.out.println("Unsupported message type " + messageType);
-                    break;
+                            byte[] notInterestedMessage = Messages.getNotInterestedMessage();
+                            sendMessage(notInterestedMessage, out);
+
+                        } else {
+
+                            byte[] interestedMessage = Messages.getInterestedMessage();
+                            sendMessage(interestedMessage, out);
+                        }
+                        break;
+
+                    // default catch all
+                    default:
+                        System.out.println("Unsupported message type " + messageType);
+                        break;
+                }
             }
         }
         catch (Exception e) {
@@ -101,31 +115,31 @@ public class ConnectionThread extends Thread{
             sendMessage(handshakeMessage, out);
             byte[] handShakeMessage = readHandShakeMessage(in);
             String handshakeHeader = new String(handShakeMessage, 0, 18);
-            System.out.println("Handshake Header: " + handshakeHeader);
+
 
             // Extract zero bits (next 10 bytes)
             String zeroBits = new String(handShakeMessage, 18, 10);
-            System.out.println("Zero Bits: " + zeroBits);
+
 
             // Extract peer ID (last 4 bytes)
             ByteBuffer buffer = ByteBuffer.wrap(handShakeMessage, 28, 4);
-            int remotePeerID = buffer.getInt();
-            System.out.println("Peer ID: " + remotePeerID);
+            this.remotePeerID = buffer.getInt();
+
             peer.fileLogger.makeConnection(remotePeerID);
         }
         else{
             byte[] handShakeMessage = readHandShakeMessage(in);
             String handshakeHeader = new String(handShakeMessage, 0, 18);
-            System.out.println("Handshake Header: " + handshakeHeader);
 
-            // Extract zero bits (next 10 bytes)
+
+
             String zeroBits = new String(handShakeMessage, 18, 10);
-            System.out.println("Zero Bits: " + zeroBits);
+
 
             // Extract peer ID (last 4 bytes)
             ByteBuffer buffer = ByteBuffer.wrap(handShakeMessage, 28, 4);
-            int remotePeerID = buffer.getInt();
-            System.out.println("Peer ID: " + remotePeerID);
+            this.remotePeerID = buffer.getInt();
+
             byte[] handshakeMessage = Messages.getHandShakeMessage(peer.getPeerID());
             sendMessage(handshakeMessage, out);
             peer.fileLogger.isConnected(remotePeerID);
