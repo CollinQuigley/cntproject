@@ -60,6 +60,14 @@ public class ConnectionThread extends Thread{
 
                 //switch statement for each message type DON"T FORGET break; FOR EACH CASE
                 switch (messageType) {
+                    // received choke from remotePeer
+                    case 0:
+                        peer.setChoking(remotePeerID, true);
+                        break;
+                    // received unchoke from remotePeer
+                    case 1:
+                        peer.setChoking(remotePeerID, false);
+                        break;
                     //peer has received interested message from remotePeer. Set remotePeer to interested
                     case 2:
                         //System.out.println("Peer Process " + remotePeerID + " is interested in Peer Process " + peer.getPeerID() + "'s pieces");

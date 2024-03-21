@@ -42,6 +42,28 @@ public class Messages {
         return message;
     }
 
+    public static byte[] getChokeMessage() {
+        ByteBuffer buffer = ByteBuffer.allocate(5);
+        buffer.putInt(1);
+
+        // type already set to 0
+        byte[] type = new byte[1];
+        buffer.put(type);
+
+        return buffer.array();
+    }
+
+    public static byte[] getUnchokeMessage() {
+        ByteBuffer buffer = ByteBuffer.allocate(5);
+        buffer.putInt(1);
+
+        byte[] type = new byte[1];
+        type[0] = 1;
+        buffer.put(type);
+
+        return buffer.array();
+    }
+
     public static byte[] getNotInterestedMessage() {
         ByteBuffer buffer = ByteBuffer.allocate(5);
         buffer.putInt(1);

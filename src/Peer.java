@@ -11,8 +11,8 @@ public class Peer {
     private int fileSize;
     private int pieceSize;
     public ConcurrentHashMap<Integer, BitField> otherPeersBitFields;
+    private ConcurrentHashMap<Integer, Boolean> peersChokingState;
     private Set<Integer> peersInterested;
-
     private Map<Integer, byte[]> filePieces;
     boolean hasFile;
 
@@ -30,6 +30,7 @@ public class Peer {
 
            filePieces = new ConcurrentHashMap<>();
            Set<Integer> set = new HashSet<>();
+           this.peersChokingState = new ConcurrentHashMap<>();
            peersInterested = Collections.synchronizedSet(set);
 
            if(hasFile) {
@@ -82,6 +83,14 @@ public class Peer {
             BitField bitField = otherPeersBitFields.get(peerId);
             bitField.printBitfield();
         }
+    }
+
+    public void setChoking(int peerID, boolean isChoking){
+        peersChokingState.put(peerID, isChoking);
+    }
+
+    public boolean isChoked(int peerID){
+        return peersChokingState.getOrDefault(peerID, false);
     }
 
     public void setInterested(int peerID){
