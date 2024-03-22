@@ -107,6 +107,25 @@ public class ConnectionThread extends Thread{
         }
     }
 
+    public void sendChokeMessage() {
+        try {
+            byte[] chokeMsg = Messages.getChokeMessage();
+            sendMessage(chokeMsg, out);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Method to send unchoke message
+    public void sendUnchokeMessage() {
+        try {
+            byte[] unchokeMsg = Messages.getUnchokeMessage();
+            sendMessage(unchokeMsg, out);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private void sendMessage(byte[] message, DataOutputStream out)  {
         try {
             out.write(message);

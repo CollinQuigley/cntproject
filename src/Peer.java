@@ -1,6 +1,11 @@
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Peer {
     public BitField bf;
@@ -15,6 +20,10 @@ public class Peer {
     private Set<Integer> peersInterested;
     private Map<Integer, byte[]> filePieces;
     boolean hasFile;
+    private ScheduledExecutorService scheduler;
+    private ConcurrentHashMap<Integer, AtomicInteger> peerDownloadRates;
+    private static final int NUMBER_OF_PREFERRED_NEIGHBORS = 4; 
+    private static final long UNCHOKING_INTERVAL = 10;
 
     FileLogger fileLogger;
     public Peer(LinkedHashMap<String,String> commonData, LinkedHashMap<Integer,String[]> peerData, int peerID) throws IOException {
@@ -39,8 +48,38 @@ public class Peer {
            else{
                initializePieces();
            }
+        peerDownloadRates = new ConcurrentHashMap<>();
+        scheduler = Executors.newScheduledThreadPool(1);
+        startUnchokingEvaluation();
 
+    }
 
+    private void startUnchokingEvaluation() {
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                evaluateAndUnchokePeers();
+            } catch (Exception e) {
+                e.printStackTrace(); // Handle exceptions appropriately.
+            }
+        }, 0, UNCHOKING_INTERVAL, TimeUnit.SECONDS);
+    }
+
+    private void evaluateAndUnchokePeers() {
+        // Determine top N peers based on download rates.
+        List<Map.Entry<Integer, AtomicInteger>> topPeers = peerDownloadRates.entrySet().stream()
+                .sorted(Map.Entry.<Integer, AtomicInteger>comparingByValue(Comparator.comparingInt(AtomicInteger::get)).reversed())
+                .limit(NUMBER_OF_PREFERRED_NEIGHBORS)
+                .collect(Collectors.toList());
+
+        // Unchoke these top N peers and possibly one additional peer for optimistic unchoking.
+        // This is a simplified example; you'll need to integrate with your connection handling logic.
+
+        // Reset download rates for the next interval.
+        peerDownloadRates.entrySet().forEach(entry -> entry.getValue().set(0));
+    }
+
+    public void updateDownloadRate(int peerID, int amount) {
+        peerDownloadRates.computeIfAbsent(peerID, k -> new AtomicInteger()).addAndGet(amount);
     }
 
     public int getPeerID(){
