@@ -21,6 +21,8 @@ public class ConnectionThread extends Thread{
 
     private boolean isInitiatedByThisProcess;
 
+    private final Object lock = new Object();
+
     DataInputStream in;
     DataOutputStream out;
     public ConnectionThread(Socket connection, Peer peer, LinkedHashMap<Integer,String[]> peerData, boolean isInitiatedByThisProcess){
@@ -48,6 +50,9 @@ public class ConnectionThread extends Thread{
             if (!handshake) {
                 doHandshake();
 
+                //add conenctionthread to peer with respective remote peerID
+                peer.remotePeerConnections.put(remotePeerID, this);
+
                 byte[] bitfieldMessage = Messages.getBitfieldMessage(peer.bf.getBitfield());
                 sendMessage(bitfieldMessage, out);
             }
@@ -70,13 +75,13 @@ public class ConnectionThread extends Thread{
                         break;
                     //peer has received interested message from remotePeer. Set remotePeer to interested
                     case 2:
-                        //System.out.println("Peer Process " + remotePeerID + " is interested in Peer Process " + peer.getPeerID() + "'s pieces");
                         peer.setInterested(remotePeerID);
+                        peer.fileLogger.receivedInterested(remotePeerID);
                         break;
                     //peer has received not interested message from remotePeer. Set remotePeer to not interested
                     case 3:
-                        //System.out.println("Peer Process " + remotePeerID + " is not interested in Peer Process " + peer.getPeerID() + "'s pieces");
                         peer.removeInterested(remotePeerID);
+                        peer.fileLogger.receivedNotInterested(remotePeerID);
                         break;
                     // peer has received a bitfield message (optional)
                     case 5:
@@ -127,12 +132,13 @@ public class ConnectionThread extends Thread{
     }
 
     private void sendMessage(byte[] message, DataOutputStream out)  {
-        try {
-            out.write(message);
-            out.flush();
-        }
-        catch (IOException e){
-            throw new RuntimeException(e);
+        synchronized (lock) {
+            try {
+                out.write(message);
+                out.flush();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
