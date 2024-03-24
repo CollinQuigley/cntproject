@@ -20,11 +20,16 @@ public class Peer {
     private Set<Integer> peersInterested;
     private Map<Integer, byte[]> filePieces;
     boolean hasFile;
-    private ScheduledExecutorService scheduler;
+    private ScheduledExecutorService optimisticallyUnchokedScheduler;
+    private ScheduledExecutorService unchokingEvaluationScheduler;
     private ConcurrentHashMap<Integer, AtomicInteger> peerDownloadRates;
-    private static final int NUMBER_OF_PREFERRED_NEIGHBORS = 4; 
-    private static final long UNCHOKING_INTERVAL = 10;
 
+    public ConcurrentHashMap<Integer, ConnectionThread> remotePeerConnections;
+    private int NUMBER_OF_PREFERRED_NEIGHBORS;
+    private int UNCHOKING_INTERVAL;
+    private int OPTIMISTIC_UNCHOKING_INTERVAL;
+
+    private int optimisticallyUnchokedNeighbor;
     FileLogger fileLogger;
     public Peer(LinkedHashMap<String,String> commonData, LinkedHashMap<Integer,String[]> peerData, int peerID) throws IOException {
            this.peerID = peerID;
@@ -45,17 +50,45 @@ public class Peer {
            if(hasFile) {
                readFile(commonData.get("FileName"));
            }
-           else{
+           else {
                initializePieces();
            }
+
+        NUMBER_OF_PREFERRED_NEIGHBORS = Integer.parseInt(commonData.get("NumberOfPreferredNeighbors"));
+        UNCHOKING_INTERVAL = Integer.parseInt(commonData.get("UnchokingInterval"));
+        OPTIMISTIC_UNCHOKING_INTERVAL = Integer.parseInt(commonData.get("OptimisticUnchokingInterval"));
+
         peerDownloadRates = new ConcurrentHashMap<>();
-        scheduler = Executors.newScheduledThreadPool(1);
+        this.remotePeerConnections = new ConcurrentHashMap<>();
+        optimisticallyUnchokedScheduler= Executors.newScheduledThreadPool(1);
+        unchokingEvaluationScheduler = Executors.newScheduledThreadPool(1);
+        this.optimisticallyUnchokedNeighbor = -1;
+
+        setOptimisticallyUnchoked();
         startUnchokingEvaluation();
 
     }
 
+    private void setOptimisticallyUnchoked(){
+        optimisticallyUnchokedScheduler.scheduleAtFixedRate(() -> {
+            if(remotePeerConnections.isEmpty()){
+                this.optimisticallyUnchokedNeighbor = -1;
+                return;
+            }
+            int currentPeerID = randomInterested();
+            if(currentPeerID == -1){
+                System.out.println("Not choosing a peer since no peer is interested");
+                this.optimisticallyUnchokedNeighbor = currentPeerID;
+                return;
+            }
+            fileLogger.changeOptimisticallyUnchoked(currentPeerID);
+
+
+        }, 0, OPTIMISTIC_UNCHOKING_INTERVAL, TimeUnit.SECONDS);
+    }
+
     private void startUnchokingEvaluation() {
-        scheduler.scheduleAtFixedRate(() -> {
+        unchokingEvaluationScheduler.scheduleAtFixedRate(() -> {
             try {
                 evaluateAndUnchokePeers();
             } catch (Exception e) {
@@ -63,7 +96,6 @@ public class Peer {
             }
         }, 0, UNCHOKING_INTERVAL, TimeUnit.SECONDS);
     }
-
     private void evaluateAndUnchokePeers() {
         // Determine top N peers based on download rates.
         List<Map.Entry<Integer, AtomicInteger>> topPeers = peerDownloadRates.entrySet().stream()
@@ -147,6 +179,25 @@ public class Peer {
 
         return peersInterested.contains(peerID);
 
+    }
+
+    //chose a random peer that is interested
+    public int randomInterested() {
+
+        if(peersInterested.isEmpty()){
+            return -1;
+        }
+        int size = peersInterested.size();
+        int item = new Random().nextInt(size);
+        int i = 0;
+        for (int peer : peersInterested) {
+            if (i == item)
+                // Return the remotepeerID directly when found
+                return peer;
+            i++;
+        }
+
+        return -1;
     }
 
     //print to see who is interested for debugging if needed
